@@ -1,0 +1,17 @@
+htbuilder
+altair
+Cython
+Pillow
+requests
+scikit-learn
+scipy
+seaborn
+setuptools
+numpy
+pandas
+matplotlib
+plotly
+prophet>=1.1
+streamlit
+statsmodels
+codecarbon
