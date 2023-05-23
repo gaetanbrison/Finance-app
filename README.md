@@ -1,1 +1,1 @@
-# predictive-analytics-app
+# app-predictive-analytics
