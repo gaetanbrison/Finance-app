@@ -5,6 +5,9 @@ import numpy as np
 from pathlib import Path
 import base64
 from datetime import date, datetime
+import yfinance as yf
+
+
 
 
 import altair as alt
@@ -47,7 +50,7 @@ st.set_option('deprecation.showPyplotGlobalUse', False)
 
 
 st.set_page_config(
-    page_title="Time Series Playground by EDHEC ", layout="wide", page_icon="./images/flask.png"
+    page_title="Time Series Playground", layout="wide", page_icon="./images/flask.png"
 )
 
 def img_to_bytes(img_path):
@@ -87,7 +90,7 @@ def main():
     # hide the footer
     hide_header_footer()
 
-image_edhec = Image.open('images/edhec.png')
+image_edhec = Image.open('images/hec.png')
 st.image(image_edhec, width=400)
 
 st.sidebar.header("Dashboard")
@@ -95,7 +98,7 @@ st.sidebar.markdown("---")
 
 st.sidebar.header("Select Stock Symbol")
 list_symbols = ['AAPL', 'AMZN', 'IBM','MSFT','TSLA','NVDA',
-                    'PG','JPM','WMT','CVX','BAC','PFE','GOOG','FB',
+                    'PG','JPM','WMT','CVX','BAC','PFE','GOOG',
                 'ADBE','AXP','BBY','BA','CSCO','C','DIS','EBAY','ETSY','GE','INTC','JPM']
 dictionary_symbols = {
     'AAPL':'Apple',
@@ -111,7 +114,6 @@ dictionary_symbols = {
     'BAC':'Bank of America',
     'PFE':'Pfizer',
     'GOOG':'Alphabet',
-    'FB':'Meta',
     'ADBE':'Adobe',
     'AXP':'American Express',
     'BBY':'Best Buy',
@@ -129,24 +131,24 @@ symbols = st.sidebar.multiselect("", list_symbols, list_symbols[:5])
 
 
 st.sidebar.header("Select Stock KPI")
-list_kpi = ['High', 'Low','Open','Close','Volume','Adj Close']
+list_kpi = ['High', 'Low','Open','Close','Volume']
 kpi = st.sidebar.selectbox("", list_kpi)
 
 
 
 
 
-@st.experimental_memo
+@st.cache_data
 def get_data():
     source = data.stocks()
     source = source[source.date.gt("2004-01-01")]
     return source
 
 
-@st.experimental_memo(ttl=60 * 60 * 24)
+@st.cache_data
 def get_chart(data):
     hover = alt.selection_single(
-        fields=["date"],
+        fields=["Date_2"],
         nearest=True,
         on="mouseover",
         empty="none",
@@ -156,9 +158,9 @@ def get_chart(data):
         alt.Chart(data, title="Evolution of stock prices")
         .mark_line()
         .encode(
-            x="date",
+            x="Date_2",
             y=kpi,
-            color="symbol",
+            #color="symbol",
             # strokeDash="symbol",
         )
     )
@@ -185,7 +187,7 @@ def get_chart(data):
     return (lines + points + tooltips).interactive()
 
 
-st.title("EDHEC - Time series playground 🧪")
+st.title("HEC Paris- Time series playground 🧪")
 st.subheader("Understand Time Series Models (ARIMA) with a Finance Example 📈")
 
 st.markdown(
@@ -201,8 +203,8 @@ st.markdown(
 
 start_date = st.date_input(
         "Select start date",
-        date(2017, 8, 1),
-        min_value=datetime.strptime("2017-08-01", "%Y-%m-%d"),
+        date(2022, 1, 1),
+        min_value=datetime.strptime("2022-01-01", "%Y-%m-%d"),
         max_value=datetime.now(),
     )
 
@@ -211,21 +213,37 @@ start_date = st.date_input(
 
 
 
-
-
-
+#symbols = ['AAPL', 'AMZN', 'IBM','MSFT','TSLA','NVDA',
+#                    'PG','JPM','WMT','CVX','BAC','PFE','GOOG',
+#                'ADBE','AXP','BBY','BA','CSCO','C','DIS','EBAY','ETSY','GE','INTC','JPM']
+                
+#kpi = ['High', 'Low','Open','Close','Volume']
 list_dataframes = []
 for i in range(0,len(symbols)):
-    df_data = pdr.get_data_yahoo(symbols[i])
-    df_inter = pd.DataFrame(
-        {'symbol': [symbols[i]]*len(list(df_data.index)),
-        'date': list(df_data.index),
-        kpi: list(df_data[kpi])
-        })
-    list_dataframes.append(df_inter)
+    data = yf.Ticker(symbols[i])
+    df_data = data.history(period="16mo")
+    df_data['Date'] = pd.to_datetime(df_data.index).date.astype(str)
+    df_data["symbol"] = [symbols[i]]*len(list(df_data.index))
 
+    #df_data = pdr.get_data_yahoo(symbols[i])
+    list_dataframes.append(df_data)
 df_master = pd.concat(list_dataframes).reset_index(drop=True)
-df_master = df_master[df_master['date'] > pd.to_datetime(start_date)]
+df_master = df_master[pd.to_datetime(df_master['Date']) > pd.to_datetime(start_date)]
+
+
+# list_dataframes = []
+# for i in range(0,len(symbols)):
+#     df_data = yf.Ticker(symbols[i])
+#     #df_data = pdr.get_data_yahoo(symbols[i])
+#     df_inter = pd.DataFrame(
+#         {'symbol': [symbols[i]]*len(list(df_data.index)),
+#         'date': list(df_data.index),
+#         kpi: list(df_data[kpi])
+#         })
+#     list_dataframes.append(df_inter)
+
+# df_master = pd.concat(list_dataframes).reset_index(drop=True)
+# df_master = df_master[df_master['date'] > pd.to_datetime(start_date)]
 
 
 st.subheader(" ")
@@ -234,8 +252,12 @@ st.subheader(" ")
 
 
 
-
-chart = get_chart(df_master)
+df_master["Date"] = pd.to_datetime(df_master["Date"])
+chart = alt.Chart(df_master, title="Evolution of stock prices").mark_line().encode(x="Date",y=kpi,
+            color="symbol",
+            # strokeDash="symbol",
+        )
+#chart = get_chart(df_master)
 st.altair_chart((chart).interactive(), use_container_width=True)
 
 if st.button('Display  📦  used in code  🔍  '):
@@ -333,10 +355,6 @@ snippet_placeholder.code(snippet)
 
 
 
-
-
-
-
 st.subheader(" ")
 st.subheader("03 - Select One Stock for the Analysis")
 st.subheader(" ")
@@ -345,18 +363,24 @@ st.header("Select Symbol to Forecast")
 symbol_forecast = st.selectbox("", symbols)
 st.success(f'You have selected {dictionary_symbols[symbol_forecast]} stock. Here are the top 5 rows from dataset')
 
+#data = yf.Ticker(symbol_forecast)
+#df_data = data.history(period="12mo")
+#    df_data['Date'] = pd.to_datetime(df_data.index).date.astype(str)
+#    df_data["symbol"] = [symbols[i]]*len(list(df_data.index))
+#st.dataframe(df_data.tail())
+df_data_2 = df_master[df_master["symbol"] == symbol_forecast].reset_index(drop=True)
+#df_data_2 = pdr.get_data_yahoo(symbol_forecast)
+#df_inter_2 = pd.DataFrame(
+#         {'symbol': [symbol_forecast]*len(list(df_data_2.index)),
+#         'date': list(df_data_2.index),
+#         kpi: list(df_data_2[kpi])
+#         })
 
-df_data_2 = pdr.get_data_yahoo(symbol_forecast)
-df_inter_2 = pd.DataFrame(
-         {'symbol': [symbol_forecast]*len(list(df_data_2.index)),
-         'date': list(df_data_2.index),
-         kpi: list(df_data_2[kpi])
-         })
-
-
-df_inter_3 = df_inter_2[['date', kpi]]
-df_inter_3.columns = ['date', kpi]
-df_inter_3 = df_inter_3.rename(columns={'date': 'ds', kpi: 'y'})
+df_inter_2 = df_data_2.copy()
+st.dataframe(df_data_2.head())
+df_inter_3 = df_inter_2[['Date', kpi]]
+df_inter_3.columns = ['Date', kpi]
+df_inter_3 = df_inter_3.rename(columns={'Date': 'ds', kpi: 'y'})
 df_inter_3['ds'] = to_datetime(df_inter_3['ds'])
 st.dataframe(df_inter_3.head())
 
@@ -369,7 +393,7 @@ df_final = df_final.set_index(['ds'])
 df_final2 = df_final.asfreq(pd.infer_freq(df_final.index))
 
 start_date = datetime(2018,1,2)
-end_date = datetime(2022,6,1)
+end_date = today = date.today()
 df_final3 = df_final2[start_date:end_date]
 
 
@@ -509,9 +533,9 @@ st.subheader(f"07 - One Step Ahead forecast of {dictionary_symbols[symbol_foreca
 st.subheader(" ")
 
 
-pred = results.get_prediction(start=pd.to_datetime('2018-06-01'), dynamic=False)
+pred = results.get_prediction(start=pd.to_datetime('2023-01-01'), dynamic=False)
 pred_ci = pred.conf_int()
-ax = df_final5.y['2018':].plot(label='observed')
+ax = df_final5.y['2023':].plot(label='observed')
 pred.predicted_mean.plot(ax=ax, label='One-step ahead Forecast', alpha=.7, figsize=(14, 4))
 ax.fill_between(pred_ci.index,
                pred_ci.iloc[:, 0],
@@ -527,9 +551,9 @@ snippet = f"""
 ## Run of one step ahead forecast
 
 
-pred = results.get_prediction(start=pd.to_datetime('2018-06-01'), dynamic=False)
+pred = results.get_prediction(start=pd.to_datetime('2023-01-01'), dynamic=False)
 pred_ci = pred.conf_int()
-ax = df_final5.y['2018':].plot(label='observed')
+ax = df_final5.y['2023':].plot(label='observed')
 pred.predicted_mean.plot(ax=ax, label='One-step ahead Forecast', alpha=.7, figsize=(14, 4))
 ax.fill_between(pred_ci.index,
                pred_ci.iloc[:, 0],
@@ -554,7 +578,7 @@ st.write("##### MSE and RMSE are kpis used to judge on how well our ARIMA model 
 st.subheader(" ")
 
 y_forecasted = pred.predicted_mean
-y_truth = df_final5.y['2018-06-01':]
+y_truth = df_final5.y['2023-01-01':]
 mse = ((y_forecasted - y_truth) ** 2).mean()
 st.success('The Mean Squared Error is {}'.format(round(mse, 2)))
 st.success('The Root Mean Squared Error is {}'.format(round(np.sqrt(mse), 2)))
@@ -565,7 +589,7 @@ snippet = f"""
 ## Calculate goodness of predictions
 
 y_forecasted = pred.predicted_mean
-y_truth = df_final5.y['2018-06-01':]
+y_truth = df_final5.y['2023-01-01':]
 mse = ((y_forecasted - y_truth) ** 2).mean()
 st.success('The Mean Squared Error is '.format(round(mse, 2)))
 st.success('The Root Mean Squared Error is '.format(round(np.sqrt(mse), 2)))
@@ -675,7 +699,7 @@ def layout(*args):
 def footer2():
     myargs = [
         " Made by ",
-        link("https://www.edhec.edu/en", "EDHEC - Gaëtan Brison"),
+        link("https://www.edhec.edu/en", "Gaëtan Brison"),
         "👨🏼‍💻"
     ]
     layout(*myargs)
